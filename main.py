@@ -1,6 +1,5 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
@@ -32,16 +31,14 @@ name = ''
 # Driver init
 def init_driver():
     global driver
-    capabilities = DesiredCapabilities.CHROME
-    capabilities["goog:loggingPrefs"] = {"performance": "ALL"}
     chromeOptions = webdriver.ChromeOptions()
+    chromeOptions.set_capability("goog:loggingPrefs", {"performance": "ALL"})
     prefs = {"download.default_directory": DOWNLOAD_PATH}
     chromeOptions.add_experimental_option("prefs", prefs)
     chromeOptions.add_experimental_option(
         'excludeSwitches', ['enable-logging'])
     print("Initiating Chrome Driver...")
-    driver = webdriver.Chrome(
-        desired_capabilities=capabilities, options=chromeOptions)
+    driver = webdriver.Chrome(options=chromeOptions)
 
 
 def login():
@@ -89,7 +86,7 @@ def download(link, _type):
             url = event['params']['response']['url']
         except:
             continue
-        if re.search('\.m3u8', url):
+        if re.search(r'\.m3u8', url):
             flag = 0
             for item in videoLinks:
                 if item == url:
