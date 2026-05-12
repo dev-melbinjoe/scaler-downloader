@@ -1,4 +1,8 @@
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+
+from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -17,10 +21,9 @@ from rename import rename_dir
 
 CLASSROOM = "https://www.scaler.com/academy/mentee-dashboard/classes/regular"
 MASTERCLASS = "https://www.scaler.com/academy/mentee-dashboard/classes/events/masterclasses"
-DOWNLOAD_PATH = str(pathlib.Path(
-    __file__).parent.absolute()) + r"\output\raw\\"
-DOWNLOAD_PATH = DOWNLOAD_PATH[:-1]
+BASE_DIR = pathlib.Path(__file__).parent.absolute()
 
+DOWNLOAD_PATH = str(BASE_DIR / "output" / "raw")
 driver = None
 videoLinks = set([])
 titleSet = set([])
@@ -31,15 +34,43 @@ name = ''
 # Driver init
 def init_driver():
     global driver
-    chromeOptions = webdriver.ChromeOptions()
-    chromeOptions.set_capability("goog:loggingPrefs", {"performance": "ALL"})
-    prefs = {"download.default_directory": DOWNLOAD_PATH}
-    chromeOptions.add_experimental_option("prefs", prefs)
-    chromeOptions.add_experimental_option(
-        'excludeSwitches', ['enable-logging'])
-    print("Initiating Chrome Driver...")
-    driver = webdriver.Chrome(options=chromeOptions)
 
+    chromeOptions = webdriver.ChromeOptions()
+
+    # Enable performance logs
+    chromeOptions.set_capability(
+        "goog:loggingPrefs",
+        {"performance": "ALL"}
+    )
+
+    # Download settings
+    prefs = {
+        "download.default_directory": DOWNLOAD_PATH,
+        "download.prompt_for_download": False,
+        "download.directory_upgrade": True
+    }
+
+    chromeOptions.add_experimental_option("prefs", prefs)
+
+    # Hide annoying logs
+    chromeOptions.add_experimental_option(
+        "excludeSwitches",
+        ["enable-logging"]
+    )
+
+    # Optional stability flags
+    chromeOptions.add_argument("--disable-blink-features=AutomationControlled")
+    chromeOptions.add_argument("--start-maximized")
+
+    print("Initiating Chrome Driver...")
+
+    # Automatically download correct ChromeDriver
+    service = Service(ChromeDriverManager().install())
+
+    driver = webdriver.Chrome(
+        service=service,
+        options=chromeOptions
+    )
 
 def login():
     driver.find_element(By.NAME, 'user[email]').send_keys(EMAIL)
@@ -84,7 +115,7 @@ def download(link, _type):
     for event in events:
         try:
             url = event['params']['response']['url']
-        except:
+        except KeyError:
             continue
         if re.search(r'\.m3u8', url):
             flag = 0
@@ -103,7 +134,7 @@ def download(link, _type):
                 hashd = hashd[:-5]
             else:
                 hashd = params[4]
-            titleSet.add(title)
+            titleSet.add(title.text)
             hashSet.add(hashd)
             with open("output/hash.txt", 'a') as output:
                 output.write(f"{title.text} || {hashd}\n")
@@ -117,8 +148,8 @@ def download(link, _type):
                 if g.endswith('.m3u8'):
                     try:
                         shutil.move(DOWNLOAD_PATH + g, dest)
-                    except:
-                        pass
+                    except Exception as e:
+                        print(f"Move failed: {e}")
                     sleep(1)
     return True
 
@@ -134,7 +165,7 @@ def download_classroom():
     driver.get(CLASSROOM)
     login()
     success = 0
-    WebDriverWait(driver, 3).until(EC.presence_of_element_located(
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located(
         (By.CLASS_NAME, 'icon-plus-circle')))
     icons = driver.find_elements(By.CLASS_NAME, 'icon-plus-circle')
     for i in icons:
