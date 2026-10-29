@@ -1,0 +1,16 @@
+/.vscode
+/.vs
+__pycache__/
+/.venv/
+
+# Browser profile holds your Scaler login session -- never commit it.
+/.scaler_profile/
+# Network captures from `probe` contain personal account data.
+/.debug/
+
+# Downloaded videos, transcripts and notes.
+/library/
+/downloads/
+/output/raw/*
+
+config.toml
