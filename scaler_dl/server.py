@@ -253,7 +253,9 @@ def make_handler(jobs: Jobs, port: int):
                     entry = _find(int(body.get("class_id")))
                 except (LookupError, TypeError, ValueError) as e:
                     return self._json(400, {"error": str(e)})
-                if not (library.is_class(entry) and entry.get("has_recording")):
+                if not library.is_class(entry):
+                    return self._json(400, {"error": "Tests, breaks and holidays have no recording."})
+                if not entry.get("has_recording"):
                     return self._json(400, {"error": "This class has no recording yet."})
                 jobs.add("process", entry)
                 return self._json(200, {"ok": True})

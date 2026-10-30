@@ -7,7 +7,7 @@ For every class you get:
 
 | File | What it is |
 |---|---|
-| `notes.html` | **The study document.** Video player on the left; on the right, Scaler's revision notes, flashcards, then the class chapter by chapter (the instructor's own bookmarks) with screenshots of every slide/board, key moments, in-class quizzes with a "▶ solution" jump, doubts asked, key terms, links shared in class and the full transcript. **Click any timestamp and the video jumps there.** Captions (CC), resume-where-you-left-off, print to PDF. |
+| `notes.html` | **The study document.** Video player on the left; on the right, Scaler's revision notes, flashcards, then the class chapter by chapter (the instructor's own bookmarks) with screenshots of every slide/board, key moments, in-class quizzes with a "▶ solution" jump, doubts students asked, questions to test yourself, a topic index (where each topic comes up), links shared in class and the full transcript. **Click any timestamp and the video jumps there.** Captions (CC), resume-where-you-left-off, print to PDF. |
 | `notes.md` | The same notes as Markdown (Obsidian, VS Code, GitHub). |
 | `video.mp4` | The recording (720p by default, ~0.4 GB for a 2.5 h class). |
 | `video.srt` / `video.vtt` | Subtitles; VLC and most players load them automatically. |
@@ -16,7 +16,8 @@ For every class you get:
 | `attachments/` | The instructor's lecture notes PDF, when Scaler has one. |
 | `revision_notes.md`, `flashcards.json`, `class.json` | Raw material from Scaler (notes by Scaler Companion, bookmarks, quizzes, shared links). |
 
-`library/index.html` lists all your classes by module and links to every class's notes.
+All classes live in `library/`, one folder each; `library/index.html` is the library page
+described below.
 
 ## Setup (once)
 
@@ -52,9 +53,12 @@ breaks and holidays, each with a ↗ link to the same item on Scaler. From the p
 - **■ Stop** in the progress panel: stops the running job and clears the queue. Downloads and
   transcripts continue where they stopped the next time you start that class.
 
-Jobs run one at a time, in the order you click; progress and an activity log show at the top.
+Jobs run one at a time, in the order you click; progress and an activity log show at the top,
+and the list updates itself when a job finishes. There is also a search box.
 **Keep the console window open while jobs run**; closing it (or Ctrl+C) stops the app.
-Opening `library/index.html` directly as a file still works for reading, just without buttons.
+Starting `main.py` again while it's running just reopens the page. Opening `library/index.html`
+directly as a file still works for reading, just without buttons. The page always downloads
+720p video and transcribes with Whisper `small`; the command line lets you change both.
 
 ## Use: command line
 
@@ -107,13 +111,13 @@ Register-ScheduledTask -TaskName "Scaler Downloader" -Action $action -Trigger $t
 Separate steps, if you prefer: `download`, `transcribe`, `notes` (same class selection).
 Every step can be interrupted and resumes where it stopped: just run the command again.
 
-Options: `--quality 480` (smaller videos), `--model base` (faster but rougher transcript) or
-`--model medium` (better but ~3x slower).
+Command-line options: `--quality 480` (smaller videos), `--model base` (faster but rougher
+transcript) or `--model medium` (better but ~3x slower).
 
 ### How long it takes (4-core laptop CPU, no GPU)
 
 - Download: ~5 min per class (400 MB at 720p).
-- Transcript: **~30 min per 2.5 h class** (Whisper `small`). Fine to leave running overnight.
+- Transcript: **~20–30 min per 2.5 h class** (Whisper `small`). Fine to leave running overnight.
 - Screenshots + notes: ~20 s per class.
 
 ### Disk space
@@ -138,14 +142,31 @@ filling the disk. Ways to make room:
   why the tool always opens a normal Chrome window and has no "headless" option.
 - **Privacy.** Class chats and participant lists contain other students' details; the tool
   never saves them. It keeps only the instructor's bookmarks, quizzes, notices and messages.
+- **"Scaler needs you to log in again"**: press **Log in to Scaler** on the page (or run
+  `python main.py login`), log in, close that Chrome window, then repeat what you were doing.
 - **When Scaler changes its website** and something stops working, run
-  `.venv\Scripts\python main.py probe`: log in, open a class recording, close the window. It
+  `python main.py probe`: log in, open a class recording, close the window. It
   records the site's API calls into `.debug/` (cookies and passwords redacted) so the code in
   `scaler_dl/scaler.py` can be updated.
 - Transcripts come from a speech model running on your PC and contain some misheard words; the
   video is always one click away.
 
 For personal study of classes you have access to. Respect Scaler's terms of use.
+
+## What's in this folder
+
+| Path | What it is |
+|---|---|
+| `main.py` | Start here: opens the library page; with a command, the command line. |
+| `Open Scaler Library.bat` | Double-click version of `python main.py`. |
+| `update.bat` | "Get new recordings" without the page (also what Task Scheduler runs). |
+| `scaler_dl/` | The code. `helperfiles/HANDOFF.md` has a map of what each file does. |
+| `ffmpeg.exe` | Joins the downloaded video pieces and reads audio for transcription. |
+| `helperfiles/` | Handoff note for continuing elsewhere, and the chat history of how this was built. |
+
+These stay on your PC and are kept out of git: `library/` (videos and notes),
+`.scaler_profile/` (your Scaler login), `.debug/` (captures from `probe`), `.venv/` (Python
+packages).
 
 ## Credits
 

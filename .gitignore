@@ -10,7 +10,3 @@ __pycache__/
 
 # Downloaded videos, transcripts and notes.
 /library/
-/downloads/
-/output/raw/*
-
-config.toml

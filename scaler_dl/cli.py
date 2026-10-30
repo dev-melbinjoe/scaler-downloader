@@ -21,7 +21,7 @@ def _selected(args: argparse.Namespace) -> list[dict]:
 
     catalog = library.load_catalog()
     if not catalog["classes"]:
-        sys.exit("No class list yet. Run `python -m scaler_dl sync` first.")
+        sys.exit("No class list yet. Run `python main.py sync` first (or press Refresh class list on the library page).")
     chosen = library.select(catalog, args.classes, args.module, args.search)
     if not chosen:
         sys.exit("No classes selected. Give class numbers (see `list`), e.g. `5`, `3-7`, `all`, or --module/--search.")
@@ -32,7 +32,7 @@ def _header(entry: dict) -> None:
     from .library import tag
 
     label = f"  ({tag(entry)})" if tag(entry) else ""
-    print(f"\n[{entry['no']}] {entry['date'][:10] if entry.get('date') else '????-??-??'}  {entry['title']}{label}", flush=True)
+    print(f"\n[{entry.get('no', '-')}] {entry['date'][:10] if entry.get('date') else '????-??-??'}  {entry['title']}{label}", flush=True)
 
 
 def cmd_login(args: argparse.Namespace) -> int:
@@ -123,7 +123,7 @@ def _download(scaler, entries: list[dict], args: argparse.Namespace) -> int:
             print(f"  STOPPED: not enough disk space -- {e}")
             return 2
         except NotLoggedIn as e:
-            print(f"  STOPPED: {e}")
+            print(f"  STOPPED: {e} Log in again with `python main.py login`, then rerun this.")
             return 2
         except library.NoRecording as e:
             print(f"  skipped: {e}")
@@ -241,7 +241,15 @@ def cmd_transcribe(args: argparse.Namespace) -> int:
 
 
 def cmd_notes(args: argparse.Namespace) -> int:
-    _notes(_downloaded(args, "class.json"))
+    from . import library
+
+    # A video, or notes made before (you may have deleted the video to save space). Not a
+    # half-finished download: notes there would mark the class done and stop it being resumed.
+    entries = [
+        e for e in _downloaded(args, "class.json")
+        if (library.class_dir(e) / "video.mp4").exists() or (library.class_dir(e) / "notes.html").exists()
+    ]
+    _notes(entries)
     return 0
 
 

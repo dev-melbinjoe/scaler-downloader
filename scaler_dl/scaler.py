@@ -46,7 +46,7 @@ class Scaler:
         """Open the dashboard once: confirms the session and picks up the tokens its API calls need."""
         self.page.goto(DASHBOARD_URL, wait_until="domcontentloaded")
         if "/users/" in self.page.url:  # bounced to sign-in or the device-limit page
-            raise NotLoggedIn("Not logged in to Scaler. Run `python -m scaler_dl login` first.")
+            raise NotLoggedIn("Not logged in to Scaler.")  # the CLI and the page each say how to log in
         self.csrf = self.page.evaluate("() => document.querySelector('meta[name=csrf-token]')?.content || ''")
         self.auth_token = self.page.evaluate("() => window.__AUTH_TOKEN__ || ''")
 
@@ -74,7 +74,7 @@ class Scaler:
                     if attempt == 4:
                         raise ScalerError(f"HTTP {resp.status} for {url}")
                 elif resp.status in (401, 403) and url.startswith(BASE_URL):
-                    raise NotLoggedIn("Scaler rejected the session. Run `python -m scaler_dl login` again.")
+                    raise NotLoggedIn("Scaler rejected the saved login.")
                 else:
                     return resp
             time.sleep(2 ** attempt)

@@ -157,7 +157,7 @@ def sync(scaler: Scaler) -> dict:
 
 
 def select(catalog: dict, spec: list[str], module: str | None = None, search: str | None = None) -> list[dict]:
-    classes = catalog["classes"]
+    classes = [c for c in catalog["classes"] if is_class(c)]  # tests/breaks have nothing to download
     if spec and spec != ["all"]:
         wanted: set[int] = set()
         for token in ",".join(spec).replace(" ", ",").split(","):
