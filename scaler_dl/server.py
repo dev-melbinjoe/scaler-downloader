@@ -308,6 +308,17 @@ def make_handler(jobs: Jobs, port: int):
     return Handler
 
 
+class _Server(http.server.ThreadingHTTPServer):
+    daemon_threads = True
+
+    def handle_error(self, request, client_address) -> None:
+        # The browser drops connections all the time (leaving a page mid-request, seeking in a
+        # video); on Windows that surfaces as WinError 10053/10054. Nothing is wrong: stay quiet.
+        if isinstance(sys.exc_info()[1], (ConnectionError, TimeoutError)):
+            return
+        super().handle_error(request, client_address)
+
+
 def _already_running(port: int) -> bool:
     """Another `main.py` serving this library? Then just open its page instead of a second copy
     (two copies would run jobs on the same files at the same time)."""
@@ -333,7 +344,7 @@ def serve(port: int = 8765, open_page: bool = True) -> int:
     server = None
     for p in range(port, port + 10):
         try:
-            server = http.server.ThreadingHTTPServer(("127.0.0.1", p), make_handler(jobs, p))
+            server = _Server(("127.0.0.1", p), make_handler(jobs, p))
             port = p
             break
         except OSError:
@@ -341,7 +352,6 @@ def serve(port: int = 8765, open_page: bool = True) -> int:
     if server is None:
         print(f"Couldn't open a local port between {port} and {port + 9}.")
         return 1
-    server.daemon_threads = True
     url = f"http://127.0.0.1:{port}/"
     print(f"Your Scaler library is open at {url}")
     print("Keep this window open while you use the buttons. Press Ctrl+C to quit.", flush=True)
