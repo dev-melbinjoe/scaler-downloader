@@ -29,6 +29,7 @@ def load_audio(media: Path) -> np.ndarray:
     proc = subprocess.run(
         [ffmpeg_exe(), "-nostdin", "-hide_banner", "-loglevel", "error", "-i", str(media),
          "-vn", "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "s16le", "-"],
+        check=False,
         capture_output=True,
     )
     if proc.returncode != 0:
@@ -113,7 +114,7 @@ def transcribe(
                     last_report = now
                     speed = (seg["end"] - resume_at) / max(now - started, 1)  # audio seconds per wall second
                     print(
-                        f"  {hms(seg['end'])} / {hms(duration)} ({seg['end'] / duration:.0%})"
+                        f"  {hms(seg['end'])} / {hms(duration)} ({seg['end'] / max(duration, 1.0):.0%})"
                         f"  speed {speed:.1f}x  ETA {hms((duration - seg['end']) / max(speed, 1e-6))}",
                         flush=True,
                     )

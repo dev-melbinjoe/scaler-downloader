@@ -28,6 +28,8 @@ def human_duration(seconds: float) -> str:
 
 def safe_filename(text: str, limit: int = 80) -> str:
     """Windows-safe file/folder name that still reads like the original title."""
+    if not text:
+        return "untitled"
     text = re.sub(r'[<>:"/\\|?*\x00-\x1f]', " ", text)
     text = re.sub(r"\s+", " ", text).strip(" .")
     return text[:limit].rstrip(" .") or "untitled"

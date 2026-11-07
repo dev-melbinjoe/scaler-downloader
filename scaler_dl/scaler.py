@@ -16,7 +16,8 @@ import re
 import time
 from urllib.parse import urlencode
 
-from playwright.sync_api import BrowserContext, Error as PlaywrightError
+from playwright.sync_api import BrowserContext
+from playwright.sync_api import Error as PlaywrightError
 
 from .config import BASE_URL, DASHBOARD_URL
 
@@ -179,7 +180,10 @@ class Scaler:
 
     def _companion_get(self, path: str, meeting_id: int, retry: bool = True):
         if self._companion_token is None:
-            token = self.get_json("/scaler/generate-companion-token")["token"]
+            token_resp = self.get_json("/scaler/generate-companion-token")
+            if not token_resp or "token" not in token_resp:
+                return None
+            token = token_resp["token"]
             resp = self._request(
                 f"{COMPANION_API}/api/verify_token/v1",
                 {"authorization": f"Bearer {token}", "referer": BASE_URL + "/"},
@@ -187,7 +191,10 @@ class Scaler:
             )
             if not resp.ok:
                 raise ScalerError(f"companion login failed: HTTP {resp.status}")
-            self._companion_token = resp.json()["access_token"]
+            data = resp.json()
+            if not data or "access_token" not in data:
+                return None
+            self._companion_token = data["access_token"]
         resp = self._request(
             f"{COMPANION_API}{path}?resource_type=class&resource_id={meeting_id}",
             {

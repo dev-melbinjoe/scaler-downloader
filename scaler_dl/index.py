@@ -85,7 +85,7 @@ def _row(c: dict, now: str) -> tuple[str, bool, bool]:
         f'<td class="day">{day}<small>{_when(c.get("date"))}</small></td>'
         f'<td class="title">{title}{tag_html}<div class="sub">{" · ".join(sub)}</div></td>'
         f'<td class="chips">{chips}</td>'
-        f'<td class="act"><span class="state"></span>{action} {scaler_link}</td></tr>'
+        f'<td class="act"><div class="act-wrap"><span class="state"></span>{action}</div>{scaler_link}</td></tr>'
     )
     return row, recorded, notes
 
@@ -182,13 +182,19 @@ table{width:100%;table-layout:fixed;border-collapse:collapse;background:var(--ca
 td{padding:6px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
 td.day{color:var(--muted);font-size:.85rem;line-height:1.25} td.day small{display:block;font-size:.8rem}
 td.title .sub{font-size:.78rem;color:var(--muted)}
-td.chips{white-space:nowrap} td.act{text-align:right;white-space:nowrap}
+td.chips{white-space:nowrap}
+td.act{text-align:right;white-space:nowrap;padding-right:10px}
+.act-wrap{display:inline-flex;align-items:center;gap:6px;min-width:0;vertical-align:middle}
+.prog-wrap{display:flex;flex-direction:column;gap:2px;min-width:0;width:120px}
+.prog-bar{height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+.prog-fill{height:100%;border-radius:2px;background:var(--accent);width:0%;transition:width .5s}
+.prog-label{font-size:.7rem;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chip{font-size:.72rem;border:1px solid var(--line);border-radius:999px;padding:0 7px;margin-right:3px;color:var(--muted)}
 .chip.on{background:var(--soft);color:var(--accent);border-color:transparent}
 .tag{font-size:.7rem;border-radius:4px;padding:0 6px;margin-left:6px;background:var(--warn);color:var(--warnt);vertical-align:1px}
 .tag.test{background:var(--soft);color:var(--accent)}
 tr.other td.title,tr.later td.title{color:var(--muted)}
-tr.busy{background:var(--soft)} .state{font-size:.8rem;color:var(--accent);margin-right:6px}
+tr.busy{background:var(--soft)} .state{font-size:.8rem;color:var(--accent);margin-right:0;display:inline-flex;align-items:center;vertical-align:middle}
 body:not(.live) .live-only{display:none!important} body.live .offline-only{display:none!important}
 tr.hidden,section.hidden{display:none}
 """
@@ -240,14 +246,56 @@ JS = r"""
   const render = s => {
     const cur = s.current, queued = s.queue || [];
     const busy = new Map(queued.map((j, i) => [j.class_id, 'queued ' + (i + 1)]));
-    if (cur && cur.class_id) busy.set(cur.class_id, 'working…');
+    if (cur && cur.class_id) busy.set(cur.class_id, 'working');
+
+    // Parse a progress percentage from the status string coming from the server.
+    // Formats we handle:
+    //   "234/579 segments  95 MB  2.1 MB/s  ETA 00:12:34"  → segment download
+    //   "00:04:12 / 00:48:30 (8%)"                         → transcription
+    //   "Transcribing…"                                     → transcription (indeterminate)
+    //   "taking screenshots" / "notes written"              → near-done
+    const parsePct = status => {
+      if (!status) return null;
+      const seg = status.match(/(\d+)\/(\d+)\s+segments/);
+      if (seg) return Math.round(+seg[1] / +seg[2] * 100);
+      const tr = status.match(/\((\d+)%\)/);
+      if (tr) return +tr[1];
+      if (/taking screenshots/i.test(status)) return 92;
+      if (/notes written/i.test(status)) return 98;
+      return null;
+    };
+
     document.querySelectorAll('tr.row').forEach(tr => {
       const st = busy.get(+tr.dataset.id);
       tr.classList.toggle('busy', !!st);
-      tr.querySelector('.state').textContent = st || '';
+      const stateEl = tr.querySelector('.state');
       const btn = tr.querySelector('button[data-act]');
-      if (btn) btn.disabled = !!st;
+
+      if (!st) {
+        // idle row — restore button, clear state
+        stateEl.innerHTML = '';
+        if (btn) { btn.disabled = false; btn.style.display = ''; }
+        return;
+      }
+
+      if (st === 'working') {
+        // Active job: replace button with an inline progress bar + label
+        if (btn) btn.style.display = 'none';
+        const pct = parsePct(s.status);
+        const label = s.status || 'working…';
+        const fillStyle = pct !== null ? `width:${pct}%` : 'width:100%;opacity:.4';
+        stateEl.innerHTML =
+          `<div class="prog-wrap">` +
+            `<div class="prog-bar"><div class="prog-fill" style="${fillStyle}"></div></div>` +
+            `<div class="prog-label">${esc(label)}</div>` +
+          `</div>`;
+      } else {
+        // Queued row: show position text, keep button disabled
+        stateEl.textContent = st;
+        if (btn) { btn.disabled = true; btn.style.display = ''; }
+      }
     });
+
     let h = '';
     if (cur) {
       h += `<div class="row-top"><div class="now">⏳ ${esc(cur.title)}</div><button class="btn" data-act="stop">■ Stop</button></div>`;

@@ -15,7 +15,8 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from playwright.sync_api import BrowserContext, Error as PlaywrightError, Page, Request, Response
+from playwright.sync_api import BrowserContext, Page, Request, Response
+from playwright.sync_api import Error as PlaywrightError
 
 from .browser import open_browser, wait_until_closed
 from .config import DASHBOARD_URL, DEBUG_DIR
@@ -170,13 +171,16 @@ class Recorder:
             self._write({"dom": name, "page": pg.url, "t": round(now, 3)})
 
     def finish(self) -> None:
-        (self.out / "cookie_names.json").write_text(json.dumps(self.cookie_names, indent=1), encoding="utf-8")
-        lines = [
-            f"{count:5d}  {method:6s} {ct:28s} {pattern}"
-            for (method, pattern, ct), count in self.patterns.most_common()
-        ]
-        (self.out / "summary.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
-        self.log.close()
+        try:
+            (self.out / "cookie_names.json").write_text(json.dumps(self.cookie_names, indent=1), encoding="utf-8")
+            lines = [
+                f"{count:5d}  {method:6s} {ct:28s} {pattern}"
+                for (method, pattern, ct), count in self.patterns.most_common()
+            ]
+            (self.out / "summary.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        finally:
+            if not self.log.closed:
+                self.log.close()
 
 
 def run_probe(start_url: str = DASHBOARD_URL) -> Path:

@@ -15,8 +15,8 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 from urllib.parse import urljoin
 
 from .config import ROOT
@@ -137,9 +137,18 @@ def download_recording(
 
     # Measure a few segments first so we can refuse early instead of filling the disk.
     for i in missing()[:3]:
-        _fetch(segments[i][1], parts / names[i])
+        try:
+            _fetch(segments[i][1], parts / names[i])
+        except (LinkExpired, ConnectionError, OSError):
+            break
     have = [(parts / n).stat().st_size for n in names if (parts / n).exists()]
-    estimate = sum(have) / len(have) * len(names)
+    if have:
+        avg_size = sum(have) / len(have)
+    elif chosen.get("bandwidth"):
+        avg_size = (chosen["bandwidth"] / 8) * (total_seconds / max(len(names), 1))
+    else:
+        avg_size = 350_000
+    estimate = avg_size * len(names)
     still_needed = estimate - sum(have) + estimate  # remaining parts + the final MP4 (parts are deleted after)
     if free_bytes(out_file.parent) - still_needed < RESERVE_BYTES:
         raise NotEnoughSpace(
@@ -184,7 +193,7 @@ def download_recording(
     if missing():
         raise DownloadError(f"{len(missing())} segments could not be downloaded; run the command again to resume")
 
-    target = math.ceil(max(d for d, _ in segments))
+    target = math.ceil(max((d for d, _ in segments), default=1)) or 1
     lines = ["#EXTM3U", "#EXT-X-VERSION:3", f"#EXT-X-TARGETDURATION:{target}", "#EXT-X-MEDIA-SEQUENCE:0"]
     for (d, _), name in zip(segments, names):
         lines += [f"#EXTINF:{d:.6f},", name]

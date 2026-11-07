@@ -153,7 +153,8 @@ class _Tee:
 
     def __init__(self, console, log_path: Path):
         log_path.parent.mkdir(parents=True, exist_ok=True)
-        self.console, self.log = console, open(log_path, "a", encoding="utf-8")
+        self.console = console
+        self.log = open(log_path, "a", encoding="utf-8")
 
     def write(self, text: str) -> int:
         self.console.write(text)
@@ -164,6 +165,10 @@ class _Tee:
     def flush(self) -> None:
         self.console.flush()
         self.log.flush()
+
+    def close(self) -> None:
+        if not self.log.closed:
+            self.log.close()
 
     def __getattr__(self, name):  # isatty(), encoding, ... come from the real console
         return getattr(self.console, name)
@@ -176,27 +181,33 @@ def cmd_update(args: argparse.Namespace) -> int:
     from .browser import open_browser
     from .scaler import Scaler
 
-    sys.stdout = _Tee(sys.stdout, library.LIBRARY_DIR / "update.log")
-    print(f"\n===== update {datetime.now():%Y-%m-%d %H:%M} =====", flush=True)
-    code, todo = 0, []
-    with open_browser() as ctx:
-        scaler = Scaler(ctx)
-        scaler.connect()
-        print("Checking Scaler for new classes and recordings...", flush=True)
-        catalog = library.sync(scaler)
-        refreshed = library.add_scaler_notes(scaler, catalog)
-        waiting = library.pending(catalog)
-        todo = waiting[: args.limit or None]
-        if not todo:
-            print("Up to date: every available recording already has notes.")
-        else:
-            later = f"; {len(waiting) - len(todo)} older ones left for next runs" if len(waiting) > len(todo) else ""
-            print(f"{len(todo)} class(es) to process now, newest first{later}.", flush=True)
-            code = _download(scaler, todo, args)
-    entries = [e for e in todo if (library.class_dir(e) / "video.mp4").exists()]
-    _transcribe(entries, args)
-    _notes(entries + [e for e in refreshed if e not in entries])  # also re-made: notes that gained Scaler's notes
-    return code
+    old_stdout = sys.stdout
+    tee = _Tee(sys.stdout, library.LIBRARY_DIR / "update.log")
+    sys.stdout = tee
+    try:
+        print(f"\n===== update {datetime.now():%Y-%m-%d %H:%M} =====", flush=True)
+        code, todo = 0, []
+        with open_browser() as ctx:
+            scaler = Scaler(ctx)
+            scaler.connect()
+            print("Checking Scaler for new classes and recordings...", flush=True)
+            catalog = library.sync(scaler)
+            refreshed = library.add_scaler_notes(scaler, catalog)
+            waiting = library.pending(catalog)
+            todo = waiting[: args.limit or None]
+            if not todo:
+                print("Up to date: every available recording already has notes.")
+            else:
+                later = f"; {len(waiting) - len(todo)} older ones left for next runs" if len(waiting) > len(todo) else ""
+                print(f"{len(todo)} class(es) to process now, newest first{later}.", flush=True)
+                code = _download(scaler, todo, args)
+        entries = [e for e in todo if (library.class_dir(e) / "video.mp4").exists()]
+        _transcribe(entries, args)
+        _notes(entries + [e for e in refreshed if e not in entries])  # also re-made: notes that gained Scaler's notes
+        return code
+    finally:
+        sys.stdout = old_stdout
+        tee.close()
 
 
 def _downloaded(args: argparse.Namespace, need: str) -> list[dict]:
@@ -231,7 +242,7 @@ def _notes(entries: list[dict]) -> None:
 
     for entry in entries:
         _header(entry)
-        build_notes(library.class_dir(entry), number=entry["no"])
+        build_notes(library.class_dir(entry), number=entry.get("no"))
     print(f"\nLibrary index: {build_index()}")
 
 
@@ -271,7 +282,8 @@ def cmd_run(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     # Class titles can contain emoji / non-Latin text; never crash on a legacy console code page.
     for stream in (sys.stdout, sys.stderr):
-        stream.reconfigure(encoding="utf-8", errors="replace")
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
 
     prog = "python main.py" if Path(sys.argv[0]).name == "main.py" else "python -m scaler_dl"
     parser = argparse.ArgumentParser(

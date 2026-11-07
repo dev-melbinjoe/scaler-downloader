@@ -1,7 +1,20 @@
 /.vscode
 /.vs
 __pycache__/
+*.py[cod]
 /.venv/
+
+# Build & packaging
+/build/
+/dist/
+*.egg-info/
+*.egg
+
+# Testing & linting caches
+/.pytest_cache/
+/.ruff_cache/
+.coverage
+/htmlcov/
 
 # Browser profile holds your Scaler login session -- never commit it.
 /.scaler_profile/

@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scaler-downloader"
+version = "2.0.0"
+description = "Download Scaler Academy class recordings and turn them into timestamped study notes"
+readme = "ReadMe.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Melbin Joe" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: Microsoft :: Windows",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Education",
+]
+dependencies = [
+    "playwright>=1.50",
+    "faster-whisper>=1.1; python_version < '3.15'",
+    "markdown-it-py>=3.0",
+    "numpy",
+    "av",
+    "pillow",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "ruff",
+]
+
+[project.scripts]
+scaler-dl = "scaler_dl.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["scaler_dl*"]
+
+[tool.setuptools.package-data]
+scaler_dl = ["py.typed"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

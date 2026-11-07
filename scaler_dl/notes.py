@@ -28,12 +28,12 @@ MIN_CHAPTER = 45.0
 # -- assembling ----------------------------------------------------------------------------------
 
 def build_notes(d: Path, number: int | None = None) -> Path:
-    info = read_json(d / "class.json")
+    info = read_json(d / "class.json") or {}
     if number is not None:
         info["no"] = number  # numbers can be reassigned in the catalog after the class was downloaded
     tr = read_json(d / "transcript.json")
     segments = tr["segments"] if tr else []
-    duration = float(info["recording"].get("duration") or (tr or {}).get("duration") or 0)
+    duration = float((info.get("recording") or {}).get("duration") or (tr or {}).get("duration") or 0)
     has_video = (d / "video.mp4").exists()
 
     frames = read_json(d / "frames.json")
@@ -57,8 +57,8 @@ def build_notes(d: Path, number: int | None = None) -> Path:
         ch["paragraphs"] = textproc.paragraphs(group)
         ch["highlights"] = top
         ch["frames"] = [f for f in frames if inside(f["start"])]
-        ch["quizzes"] = [q for q in quizzes if inside(q["at"])]
-        ch["doubts"] = [b for b in info["bookmarks"] if b.get("type") == "question" and inside(b["at"])]
+        ch["quizzes"] = [q for q in quizzes if inside(q.get("at"))]
+        ch["doubts"] = [b for b in info.get("bookmarks", []) if b.get("type") == "question" and inside(b.get("at"))]
 
     for c in cards:
         c["times"] = textproc.mentions(sents, c.get("card_title", ""))
@@ -78,7 +78,7 @@ def build_notes(d: Path, number: int | None = None) -> Path:
         "cards": cards,
         "terms": terms[:15],
         "questions": textproc.instructor_questions(sents),
-        "doubts": [b for b in info["bookmarks"] if b.get("type") == "question"],
+        "doubts": [b for b in info.get("bookmarks", []) if b.get("type") == "question"],
         "links": collect_links(info),
         "frames": frames,
     }
@@ -374,11 +374,11 @@ def _quiz_question_html(question: str) -> str:
 
 
 def _quiz_html(q: dict) -> str:
-    choices = "".join(f'<li><code class="choice">{_e(BR.sub(chr(10), c))}</code></li>' for c in q["choices"] if c is not None)
-    watch = f'{_ts(q["solution_at"], "▶ solution")}' if q.get("solution_at") is not None else ""
+    choices = "".join(f'<li><code class="choice">{_e(BR.sub(chr(10), c))}</code></li>' for c in q.get("choices", []) if c is not None)
+    watch = f'{_ts(q.get("solution_at"), "▶ solution")}' if q.get("solution_at") is not None else ""
     return (
-        f'<div class="quiz"><div class="label">Quiz {q["no"]} {_ts(q["at"])} {watch}</div>'
-        f'{_quiz_question_html(q["question"])}<ol type="A">{choices}</ol></div>'
+        f'<div class="quiz"><div class="label">Quiz {q.get("no", "")} {_ts(q.get("at"))} {watch}</div>'
+        f'{_quiz_question_html(q.get("question") or "")}<ol type="A">{choices}</ol></div>'
     )
 
 
@@ -452,10 +452,11 @@ def render_md(doc: dict) -> str:
 
 
 def _quiz_md(q: dict) -> str:
-    choices = "\n".join(f"   {chr(65 + i)}. `{BR.sub(' ⏎ ', c)}`" for i, c in enumerate(q["choices"]) if c is not None)
+    choices = "\n".join(f"   {chr(65 + i)}. `{BR.sub(' ⏎ ', c)}`" for i, c in enumerate(q.get("choices", [])) if c is not None)
     solution = f" · solution at `{hms(q['solution_at'])}`" if q.get("solution_at") is not None else ""
-    question = q["question"] if "```" in q["question"] else f"```\n{BR.sub(chr(10), q['question'])}\n```"
-    return f"**Quiz {q['no']}** `{hms(q['at'] or 0)}`{solution}\n\n{question}\n\n{choices}\n"
+    raw_question = q.get("question") or ""
+    question = raw_question if "```" in raw_question else f"```\n{BR.sub(chr(10), raw_question)}\n```"
+    return f"**Quiz {q.get('no', '')}** `{hms(q.get('at') or 0)}`{solution}\n\n{question}\n\n{choices}\n"
 
 
 # -- page template ---------------------------------------------------------------------------------

@@ -141,7 +141,7 @@ def run_job(jobs: Jobs, job: dict) -> str:
             if kind == "update":
                 refreshed = library.add_scaler_notes(scaler, catalog)
         for entry in refreshed:
-            build_notes(library.class_dir(entry), number=entry["no"])
+            build_notes(library.class_dir(entry), number=entry.get("no"))
             print(f"  added Scaler's revision notes to: {entry['title']}", flush=True)
         build_index()
         if kind == "sync":
@@ -158,13 +158,14 @@ def run_job(jobs: Jobs, job: dict) -> str:
         with open_browser() as ctx:
             scaler = Scaler(ctx)
             scaler.connect()
-            print(f"Downloading [{entry['no']}] {entry['title']}", flush=True)
+            no_str = f"[{entry['no']}] " if entry.get("no") else ""
+            print(f"Downloading {no_str}{entry['title']}", flush=True)
             info = library.fetch_materials(scaler, entry)
             library.download_video(scaler, entry, info, max_height=QUALITY)
     if not (d / "transcript.json").exists():
         print("Transcribing (about 30 min for a 2.5 h class)...", flush=True)
         transcribe(d / "video.mp4", d, model_size=MODEL, language=LANGUAGE, hotwords=vocabulary_hint(entry["title"]))
-    build_notes(d, number=entry["no"])
+    build_notes(d, number=entry.get("no"))
     build_index()
     return f"Notes ready: {entry['title']}"
 
@@ -263,8 +264,9 @@ def make_handler(jobs: Jobs, port: int):
 
         def _file(self, path: str) -> None:
             root = library.LIBRARY_DIR.resolve()
-            target = (root / path.lstrip("/")).resolve()
-            if root not in target.parents or not target.is_file():
+            clean = path.lstrip("/\\").replace("\\", "/")
+            target = (root / clean).resolve()
+            if not target.is_relative_to(root) or target == root or not target.is_file():
                 return self._send(404, b"Not found", "text/plain")
             size = target.stat().st_size
             ctype = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
@@ -341,29 +343,33 @@ def serve(port: int = 8765, open_page: bool = True) -> int:
             webbrowser.open(url)
         return 0
     jobs = Jobs()
+    old_stdout = sys.stdout
     sys.stdout = _Capture(sys.stdout, jobs)
     build_index()
     server = None
-    for p in range(port, port + 10):
-        try:
-            server = _Server(("127.0.0.1", p), make_handler(jobs, p))
-            port = p
-            break
-        except OSError:
-            continue
-    if server is None:
-        print(f"Couldn't open a local port between {port} and {port + 9}.")
-        return 1
-    url = f"http://127.0.0.1:{port}/"
-    print(f"Your Scaler library is open at {url}")
-    print("Keep this window open while you use the buttons. Press Ctrl+C to quit.", flush=True)
-    if open_page:
-        threading.Timer(0.5, lambda: webbrowser.open(url)).start()
     try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\nClosing. Anything unfinished continues where it left off next time.")
+        for p in range(port, port + 10):
+            try:
+                server = _Server(("127.0.0.1", p), make_handler(jobs, p))
+                port = p
+                break
+            except OSError:
+                continue
+        if server is None:
+            print(f"Couldn't open a local port between {port} and {port + 9}.")
+            return 1
+        url = f"http://127.0.0.1:{port}/"
+        print(f"Your Scaler library is open at {url}")
+        print("Keep this window open while you use the buttons. Press Ctrl+C to quit.", flush=True)
+        if open_page:
+            threading.Timer(0.5, lambda: webbrowser.open(url)).start()
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            print("\nClosing. Anything unfinished continues where it left off next time.")
+        finally:
+            control.STOP.set()
+            server.server_close()
     finally:
-        control.STOP.set()
-        server.server_close()
+        sys.stdout = old_stdout
     return 0

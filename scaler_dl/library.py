@@ -6,11 +6,20 @@ import json
 import mimetypes
 import os
 import re
+import shutil
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
+
+# Use the Windows certificate store for SSL verification so that corporate /
+# self-signed CA chains trusted by the OS are also trusted by urllib.
+try:
+    import truststore
+    truststore.inject_into_ssl()
+except ImportError:
+    pass
 
 from .config import BASE_URL, ROOT
 from .downloader import USER_AGENT, download_recording
@@ -272,7 +281,7 @@ def fetch_materials(scaler: Scaler, entry: dict) -> dict:
 
     info = {
         "class_id": entry["class_id"],
-        "no": entry["no"],
+        "no": entry.get("no"),
         "title": lesson.get("title") or entry["title"],
         "module": entry["module"],
         "date": lesson.get("start_time") or entry["date"],
@@ -335,7 +344,8 @@ def _download_attachment(url: str, folder: Path, name: str | None) -> str:
         ext = Path(urlsplit(url).path).suffix or mimetypes.guess_extension(resp.headers.get_content_type() or "") or ""
         base = safe_filename(name or Path(urlsplit(url).path).stem)
         dest = folder / (base if base.lower().endswith(ext.lower()) else base + ext)
-        dest.write_bytes(resp.read())
+        with open(dest, "wb") as f:
+            shutil.copyfileobj(resp, f, 1 << 20)
     return str(dest.relative_to(folder.parent)).replace("\\", "/")
 
 

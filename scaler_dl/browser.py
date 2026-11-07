@@ -9,11 +9,12 @@ treats it as another device and ends the saved login (seen 2026-10-30).
 from __future__ import annotations
 
 import time
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Callable, Iterator
 
-from playwright.sync_api import BrowserContext, Error as PlaywrightError, sync_playwright
+from playwright.sync_api import BrowserContext, sync_playwright
+from playwright.sync_api import Error as PlaywrightError
 
 from .config import PROFILE_DIR
 
@@ -22,19 +23,29 @@ from .config import PROFILE_DIR
 def open_browser(headless: bool = False, profile_dir: Path = PROFILE_DIR) -> Iterator[BrowserContext]:
     profile_dir.mkdir(parents=True, exist_ok=True)
     with sync_playwright() as p:
-        options = dict(
-            user_data_dir=str(profile_dir),
-            headless=headless,
-            no_viewport=True,
-            args=["--start-maximized", "--disable-blink-features=AutomationControlled"],
-            ignore_default_args=["--enable-automation"],
-            accept_downloads=True,
-        )
-        try:
-            ctx = p.chromium.launch_persistent_context(channel="chrome", **options)
-        except PlaywrightError:
-            # No system Chrome: fall back to Playwright's Chromium (`python -m playwright install chromium`).
-            ctx = p.chromium.launch_persistent_context(**options)
+        options = {
+            "user_data_dir": str(profile_dir),
+            "headless": headless,
+            "no_viewport": True,
+            "args": ["--start-maximized", "--disable-blink-features=AutomationControlled"],
+            "ignore_default_args": ["--enable-automation"],
+            "accept_downloads": True,
+        }
+        ctx = None
+        for channel in ("chrome", "msedge", None):
+            try:
+                launch_opts = dict(options)
+                if channel:
+                    launch_opts["channel"] = channel
+                ctx = p.chromium.launch_persistent_context(**launch_opts)
+                break
+            except PlaywrightError:
+                continue
+        if ctx is None:
+            raise PlaywrightError(
+                "No supported browser found (Google Chrome, Microsoft Edge, or Playwright Chromium).\n"
+                "Please run: .venv\\Scripts\\playwright install chromium"
+            )
         try:
             yield ctx
         finally:

@@ -71,6 +71,9 @@ def extract_slides(
         saved.append({"start": round(start, 1), "end": round(end, 1), "file": f"frames/{name}"})
 
     with av.open(str(video)) as container:
+        if not container.streams.video:
+            write_json(out_dir / "frames.json", [])
+            return []
         stream = container.streams.video[0]
         stream.codec_context.skip_frame = "NONKEY"
         prev = ref = None
