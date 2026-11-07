@@ -15,6 +15,8 @@ from urllib.parse import urljoin, urlsplit
 
 # Use the Windows certificate store for SSL verification so that corporate /
 # self-signed CA chains trusted by the OS are also trusted by urllib.
+# Primary injection is in main.py; this is a belt-and-suspenders fallback
+# for when library is used directly (e.g. CLI, tests).
 try:
     import truststore
     truststore.inject_into_ssl()

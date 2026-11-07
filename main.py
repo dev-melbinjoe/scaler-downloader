@@ -8,6 +8,16 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Inject the OS certificate store into Python's ssl module so that urllib
+# trusts the same CAs as the system (important on Windows in corporate/
+# enterprise environments where custom root CAs are installed).  Must happen
+# before any HTTPS connection is made, so we do it here at the top level.
+try:
+    import truststore
+    truststore.inject_into_ssl()
+except ImportError:
+    pass
+
 ROOT = Path(__file__).resolve().parent
 VENV_PYTHON = ROOT / ".venv" / "Scripts" / "python.exe"
 
