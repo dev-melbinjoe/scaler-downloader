@@ -164,7 +164,11 @@ def run_job(jobs: Jobs, job: dict) -> str:
             library.download_video(scaler, entry, info, max_height=QUALITY)
     if not (d / "transcript.json").exists():
         print("Transcribing (about 30 min for a 2.5 h class)...", flush=True)
-        transcribe(d / "video.mp4", d, model_size=MODEL, language=LANGUAGE, hotwords=vocabulary_hint(entry["title"]))
+        try:
+            transcribe(d / "video.mp4", d, model_size=MODEL, language=LANGUAGE, hotwords=vocabulary_hint(entry["title"]))
+        except ModuleNotFoundError as exc:
+            print(f"  skipping transcription: {exc}", flush=True)
+            print("  building notes without transcript (no chapter text, but frames and structure preserved)...", flush=True)
     build_notes(d, number=entry.get("no"))
     build_index()
     return f"Notes ready: {entry['title']}"

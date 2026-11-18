@@ -232,7 +232,11 @@ def _transcribe(entries: list[dict], args: argparse.Namespace) -> None:
             continue
         _header(entry)
         print(f"  transcribing with Whisper '{args.model}' (the slow part: ~30 min per 2.5 h class on a 4-core CPU)", flush=True)
-        transcribe(d / "video.mp4", d, model_size=args.model, language=args.language, hotwords=vocabulary_hint(entry["title"]))
+        try:
+            transcribe(d / "video.mp4", d, model_size=args.model, language=args.language, hotwords=vocabulary_hint(entry["title"]))
+        except ModuleNotFoundError as exc:
+            print(f"  skipping transcription: {exc}", flush=True)
+            print("  building notes without transcript...", flush=True)
 
 
 def _notes(entries: list[dict]) -> None:

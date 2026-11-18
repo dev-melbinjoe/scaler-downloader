@@ -21,6 +21,14 @@ from .util import human_duration, read_json
 MODULE_URL = BASE_URL + "/academy/mentee-dashboard/core-curriculum/m/{}/classes"
 CLASS_URL = BASE_URL + "/academy/mentee-dashboard/class/{}"
 
+# Detect at import time whether faster_whisper is available on this Python.
+# Used to pick the right button label (Python 3.15 / Windows has no onnxruntime wheel).
+try:
+    import importlib.util
+    _WHISPER_AVAILABLE = importlib.util.find_spec("faster_whisper") is not None
+except Exception:
+    _WHISPER_AVAILABLE = False
+
 
 def build_index() -> Path:
     """Write the static library/index.html (used when the library is opened without main.py)."""
@@ -65,7 +73,10 @@ def _row(c: dict, now: str) -> tuple[str, bool, bool]:
             action = f'<a class="btn" href="{href}">Open notes</a>'
             classes.append("done")
         elif recorded:
-            what = "Transcribe &amp; make notes" if have["video"] else "Download &amp; make notes"
+            if have["video"]:
+                what = "Transcribe &amp; make notes" if _WHISPER_AVAILABLE else "Make notes (no transcript)"
+            else:
+                what = "Download &amp; make notes"
             action = f'<button class="btn primary live-only" data-act="process" data-id="{c["class_id"]}">{what}</button>'
             action += f'<code class="offline-only">main.py run {c["no"]}</code>'
         elif (c.get("date") or "9") > now:

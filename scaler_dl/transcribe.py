@@ -67,7 +67,15 @@ def transcribe(
     hotwords: str | None = None,
     beam_size: int = 1,  # 5 is ~1.6x slower on a laptop CPU for a barely better transcript
 ) -> list[dict]:
-    from faster_whisper import WhisperModel
+    try:
+        from faster_whisper import WhisperModel
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "faster_whisper is not installed. "
+            "It requires onnxruntime, which has no wheel for Python 3.15 on Windows. "
+            "Re-run with Python 3.10–3.14, or install manually: "
+            "pip install faster-whisper"
+        ) from exc
 
     out_dir.mkdir(parents=True, exist_ok=True)
     partial = out_dir / "transcript.partial.jsonl"
